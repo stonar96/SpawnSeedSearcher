@@ -13,6 +13,8 @@ union Rand64 {
 
 uint64_t rand64(void);
 
+int checkBiome(const Generator*, int, int, int, int, int, int[], int*);
+
 char* getLine(char*, int);
 
 int main(int argc, char* argv[]) {
@@ -73,10 +75,27 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    char* biomesString = line1;
+    char* radiusString = line1;
 
     if (argc >= 5) {
-        biomesString = argv[4];
+        radiusString = argv[4];
+    } else {
+        printf("Enter radius or press enter to use no radius: ");
+        getLine(radiusString, n);
+    }
+
+    int radius = 0;
+
+    if (radiusString[0] != '\0' && (sscanf(radiusString, "%d", &radius) != 1 || radius < 0)) {
+        printf("Invalid radius '%s'.\n", radiusString);
+        getchar();
+        return 1;
+    }
+
+    char* biomesString = line1;
+
+    if (argc >= 6) {
+        biomesString = argv[5];
     } else {
         printf("Enter biome ids separated by ',' or press enter to use all biome ids: ");
         getLine(biomesString, n);
@@ -118,8 +137,8 @@ int main(int argc, char* argv[]) {
 
     char* spawnString = line1;
 
-    if (argc >= 6) {
-        spawnString = argv[5];
+    if (argc >= 7) {
+        spawnString = argv[6];
     } else {
         printf("Enter 'y' to check if the spawn is at the given coordinates or press enter: ");
         getLine(spawnString, n);
@@ -135,8 +154,8 @@ int main(int argc, char* argv[]) {
 
     char* dimString = line1;
 
-    if (argc >= 7) {
-        dimString = argv[6];
+    if (argc >= 8) {
+        dimString = argv[7];
     } else {
         printf("Enter dimension id or press enter to use the default dimension id: ");
         getLine(dimString, n);
@@ -152,8 +171,8 @@ int main(int argc, char* argv[]) {
 
     char* flagsString = line1;
 
-    if (argc >= 8) {
-        flagsString = argv[7];
+    if (argc >= 9) {
+        flagsString = argv[8];
     } else {
         printf("Enter flags or press enter to use the default flags: ");
         getLine(flagsString, n);
@@ -195,15 +214,32 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            biome = getBiomeAt(&g, 1, x, 64, z);
-            biomeCalculated = 1;
-
-            for (int i = 0; i < biomeCount; i++) {
-                if (biomes[i] == biome) {
+            if (checkBiome(&g, 1, x, 64, z, biomeCount, biomes, &biome)) {
+                if (radius == 0) {
                     biomesCheck = 1;
-                    break;
+                } else if (checkBiome(&g, 1, x - radius, 64, z - radius, biomeCount, biomes, NULL) && checkBiome(&g, 1, x - radius, 64, z + radius, biomeCount, biomes, NULL) && checkBiome(&g, 1, x + radius, 64, z - radius, biomeCount, biomes, NULL) && checkBiome(&g, 1, x + radius, 64, z + radius, biomeCount, biomes, NULL)) {
+                    biomesCheck = 1;
+
+                    for (int i = -radius; i <= radius; i++) {
+                        for (int j = -radius; j <= radius; j++) {
+                            if (i == 0 && j == 0 || (i == -radius || i == radius) && (j == -radius || j == radius)) {
+                                continue;
+                            }
+
+                            if (!checkBiome(&g, 1, x + i, 64, z + j, biomeCount, biomes, NULL)) {
+                                biomesCheck = 0;
+                                break;
+                            }
+                        }
+
+                        if (!biomesCheck) {
+                            break;
+                        }
+                    }
                 }
             }
+
+            biomeCalculated = 1;
         }
 
         if (biomesCheck) {
@@ -269,6 +305,22 @@ uint64_t rand64(void) {
     result.values[6] = rand();
     result.values[7] = rand();
     return result.value;
+}
+
+int checkBiome(const Generator* g, int scale, int x, int y, int z, int biomeCount, int biomes[], int* biome) {
+    int b = getBiomeAt(g, scale, x, y, z);
+
+    if (biome != NULL) {
+        *biome = b;
+    }
+
+    for (int i = 0; i < biomeCount; i++) {
+        if (biomes[i] == b) {
+            return 1;
+        }
+    }
+
+    return 0;
 }
 
 char* getLine(char* line, int n) {
