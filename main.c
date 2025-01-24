@@ -34,7 +34,7 @@ int setBySequenceIndicatorFunction(int, int(*)(int, void*), void*, int, int[], i
 
 int indexOf(int, int, int[]);
 
-char* getLine(char*, int);
+char* getLine(char[], int, FILE*);
 
 int main(int argc, char* argv[]) {
     printf("SpawnSeedSearcher\n");
@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
         mcString = argv[1];
     } else {
         printf("Enter Minecraft version id or press enter to use the latest Minecraft version id: ");
-        getLine(mcString, n);
+        getLine(mcString, n, stdin);
     }
 
     int mc = MC_NEWEST;
@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
         xString = argv[2];
     } else {
         printf("Enter x coordinate or press enter to use the spawn x coordinate: ");
-        getLine(xString, n);
+        getLine(xString, n, stdin);
     }
 
     int xSpawn = xString[0] == '\0';
@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
         zString = argv[3];
     } else {
         printf("Enter z coordinate or press enter to use the spawn z coordinate: ");
-        getLine(zString, n);
+        getLine(zString, n, stdin);
     }
 
     int zSpawn = zString[0] == '\0';
@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
         radiusString = argv[4];
     } else {
         printf("Enter radius or press enter to use no radius: ");
-        getLine(radiusString, n);
+        getLine(radiusString, n, stdin);
     }
 
     int radius = 0;
@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
         setRelationString = argv[5];
     } else {
         printf("Enter set relation id or press enter to use equal: ");
-        getLine(setRelationString, n);
+        getLine(setRelationString, n, stdin);
     }
 
     int setRelation = EQUAL;
@@ -134,7 +134,7 @@ int main(int argc, char* argv[]) {
         biomesString = argv[6];
     } else {
         printf("Enter biome id sets separated by '|' with biome ids separated by ',' or press enter to use no biome id sets: ");
-        getLine(biomesString, n);
+        getLine(biomesString, n, stdin);
     }
 
     int biomeSetCount = 0;
@@ -207,7 +207,7 @@ int main(int argc, char* argv[]) {
         spawnString = argv[7];
     } else {
         printf("Enter 'y' to check if the spawn is at the given coordinates or press enter: ");
-        getLine(spawnString, n);
+        getLine(spawnString, n, stdin);
     }
 
     int spawn = 0;
@@ -224,7 +224,7 @@ int main(int argc, char* argv[]) {
         dimString = argv[8];
     } else {
         printf("Enter dimension id or press enter to use the default dimension id: ");
-        getLine(dimString, n);
+        getLine(dimString, n, stdin);
     }
 
     int dim = 0;
@@ -241,7 +241,7 @@ int main(int argc, char* argv[]) {
         flagsString = argv[9];
     } else {
         printf("Enter flags or press enter to use the default flags: ");
-        getLine(flagsString, n);
+        getLine(flagsString, n, stdin);
     }
 
     uint32_t flags = 0;
@@ -649,14 +649,22 @@ int indexOf(int value, int arrayLength, int array[]) {
     return -1;
 }
 
-char* getLine(char* line, int n) {
-    char* result = fgets(line, n, stdin);
-    char* offset = strstr(line, "\n");
+char* getLine(char line[], int lineLength, FILE* stream) {
+    line[0] = '\0'; // The contents of the array are not altered on failure.
+    char* result = fgets(line, lineLength, stream);
+    line[lineLength - 1] = '\0'; // To be on the safe side. Actually this is handled by fgets.
+    char* newLine = strchr(line, '\n');
 
-    if (offset != NULL) {
-        *offset = '\0';
+    if (newLine == NULL) {
+        int c;
+
+        while ((c = fgetc(stream)) != '\n' && c != EOF) { // https://c-faq.com/stdio/stdinflush.html
+
+        }
+
+        return result;
     }
 
-    fflush(stdin);
+    *newLine = '\0';
     return result;
 }
