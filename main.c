@@ -46,14 +46,14 @@ int main(int argc, char* argv[]) {
     if (argc >= 2) {
         mcString = argv[1];
     } else {
-        printf("Enter Minecraft version id or press enter to use the latest Minecraft version id: ");
+        printf("Enter Minecraft version ID or press enter to use the latest Minecraft version ID: ");
         getLine(mcString, n, stdin);
     }
 
     int mc = MC_NEWEST;
 
     if (mcString[0] != '\0' && (sscanf(mcString, "%d", &mc) != 1 || mc < 0 || mc > MC_NEWEST)) {
-        printf("Invalid Minecraft version id '%s'.\n", mcString);
+        printf("Invalid Minecraft version ID '%s'.\n", mcString);
         getchar();
         return 1;
     }
@@ -116,14 +116,14 @@ int main(int argc, char* argv[]) {
     if (argc >= 6) {
         setRelationString = argv[5];
     } else {
-        printf("Enter set relation id or press enter to use equal: ");
+        printf("Enter set relation ID or press enter to use equal: ");
         getLine(setRelationString, n, stdin);
     }
 
     int setRelation = EQUAL;
 
     if (setRelationString[0] != '\0' && (sscanf(setRelationString, "%d", &setRelation) != 1 || setRelation < 0 || setRelation > 3)) {
-        printf("Invalid set relation id '%s'.\n", setRelationString);
+        printf("Invalid set relation ID '%s'.\n", setRelationString);
         getchar();
         return 1;
     }
@@ -133,7 +133,7 @@ int main(int argc, char* argv[]) {
     if (argc >= 7) {
         biomesString = argv[6];
     } else {
-        printf("Enter biome id sets separated by '|' with biome ids separated by ',' or press enter to use no biome id sets: ");
+        printf("Enter biome ID sets separated by '|' with biome IDs separated by ',' or press enter to use no biome ID sets: ");
         getLine(biomesString, n, stdin);
     }
 
@@ -179,13 +179,13 @@ int main(int argc, char* argv[]) {
             int biome;
 
             if (sscanf(line2, "%d", &biome) != 1) {
-                printf("Invalid biome id '%s'.\n", line2);
+                printf("Invalid biome ID '%s'.\n", line2);
                 getchar();
                 return 1;
             }
 
             if (indexOf(biome, k, biomes) != -1) {
-                printf("Duplicate biome id '%s'.\n", line2);
+                printf("Duplicate biome ID '%s'.\n", line2);
                 getchar();
                 return 1;
             }
@@ -223,14 +223,14 @@ int main(int argc, char* argv[]) {
     if (argc >= 9) {
         dimString = argv[8];
     } else {
-        printf("Enter dimension id or press enter to use the default dimension id: ");
+        printf("Enter dimension ID or press enter to use the default dimension ID: ");
         getLine(dimString, n, stdin);
     }
 
     int dim = 0;
 
     if (dimString[0] != '\0' && (sscanf(dimString, "%d", &dim) != 1 || dim < -1 || dim > 1)) {
-        printf("Invalid dimension id '%s'.\n", dimString);
+        printf("Invalid dimension ID '%s'.\n", dimString);
         getchar();
         return 1;
     }
@@ -368,9 +368,9 @@ int main(int argc, char* argv[]) {
                 printf("%" PRId64 " (", result);
 
                 if (biomeCalculated) {
-                    printf("biome id: %d, ", biome);
+                    printf("biome ID: %d, ", biome);
                 } else {
-                    printf("biome id: -, ");
+                    printf("biome ID: -, ");
                 }
 
                 if (posCalculated) {
