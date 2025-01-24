@@ -252,13 +252,46 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    char* seedsFileString = line1;
+
+    if (argc >= 11) {
+        seedsFileString = argv[10];
+    } else {
+        printf("Enter seeds file or press enter to use random seeds: ");
+        getLine(seedsFileString, n, stdin);
+    }
+
+    FILE* seedsFile = NULL;
+
+    if (seedsFileString[0] != '\0' && (seedsFile = fopen(seedsFileString, "r")) == NULL) {
+        printf("Invalid seeds file '%s'.\n", seedsFileString);
+        getchar();
+        return 1;
+    }
+
     srand(time(NULL));
     Generator g;
     setupGenerator(&g, mc, flags);
     long long counter = 0LL;
 
-    while (1) {
-        uint64_t seed = rand64();
+    while (seedsFile == NULL || getLine(line1, n, seedsFile) != NULL) {
+        uint64_t seed;
+
+        if (seedsFile == NULL) {
+            seed = rand64();
+        } else {
+            int64_t result;
+
+            if (sscanf(line1, "%" PRId64, &result) != 1) {
+                printf("Invalid seed '%s' in seeds file '%s'.\n", line1, seedsFileString);
+                fclose(seedsFile);
+                getchar();
+                return 1;
+            }
+
+            seed = result;
+        }
+
         applySeed(&g, dim, seed);
         Pos pos;
         int posCalculated = 0;
@@ -338,6 +371,10 @@ int main(int argc, char* argv[]) {
         } else {
             counter++;
         }
+    }
+
+    if (seedsFile != NULL) {
+        fclose(seedsFile);
     }
 
     getchar();
