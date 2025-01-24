@@ -346,8 +346,9 @@ int main(int argc, char* argv[]) {
             }
 
             if (spawnCheck) {
-                if (!posCalculated) {
+                if (!posCalculated && dim == 0) {
                     pos = getSpawn(&g);
+                    posCalculated = 1;
 
                     if (xSpawn) {
                         x = pos.x;
@@ -358,12 +359,27 @@ int main(int argc, char* argv[]) {
                     }
                 }
 
-                if (!biomeCalculated) {
+                if (!biomeCalculated && (posCalculated || !xSpawn && !zSpawn)) {
                     biome = getBiomeAt(&g, 1, x, 64, z);
+                    biomeCalculated = 1;
                 }
 
                 int64_t result = seed;
-                printf("%" PRId64 " (biome id: %d, spawn x: %d, spawn z: %d, rejected: %lld)\n", result, biome, pos.x, pos.z, counter);
+                printf("%" PRId64 " (", result);
+
+                if (biomeCalculated) {
+                    printf("biome id: %d, ", biome);
+                } else {
+                    printf("biome id: -, ");
+                }
+
+                if (posCalculated) {
+                    printf("spawn x: %d, spawn z: %d, ", pos.x, pos.z);
+                } else {
+                    printf("spawn x: -, spawn z: -, ");
+                }
+
+                printf("rejected: %lld)\n", counter);
                 counter = 0LL;
             } else {
                 counter++;
