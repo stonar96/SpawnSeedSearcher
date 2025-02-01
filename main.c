@@ -4,9 +4,9 @@
 #include "cubiomes/finders.h"
 #include "cubiomes/generator.h"
 
-typedef union Rand64 Rand64;
+typedef union Random64 Random64;
 
-union Rand64 {
+union Random64 {
     uint64_t value;
     uint8_t values[8];
 };
@@ -14,19 +14,24 @@ union Rand64 {
 typedef struct BiomeSequenceData BiomeSequenceData;
 
 struct BiomeSequenceData {
-    Generator* g;
+    Generator* generator;
     int x;
+    int y;
     int z;
     int radius;
-    int biome;
-    int biomeCalculated;
+    int biomeAtXYZ;
+    int biomeAtXYZCalculated;
 };
 
 enum SetRelation {
     EQUAL, SUBSET, SUPERSET, INTERSECT
 };
 
-uint64_t rand64(void);
+uint64_t random64(void);
+
+float getApproximateHeight(Generator*, int, int);
+
+int floorToInt(float);
 
 int biomeSequence(int, void*);
 
@@ -38,16 +43,16 @@ char* getLine(char[], int, FILE*);
 
 int main(int argc, char* argv[]) {
     printf("SpawnSeedSearcher\n");
-    int n = 1024;
-    char line1[n];
-    char line2[n];
+    int lineLength = 1024;
+    char line1[lineLength];
+    char line2[lineLength];
     char* mcString = line1;
 
     if (argc >= 2) {
         mcString = argv[1];
     } else {
         printf("Enter Minecraft version ID or press enter to use the latest Minecraft version ID: ");
-        getLine(mcString, n, stdin);
+        getLine(mcString, lineLength, stdin);
     }
 
     int mc = MC_NEWEST;
@@ -58,19 +63,70 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    char* xString = line1;
+    char* flagsString = line1;
 
-    if (argc >= 4) {
-        xString = argv[2];
+    if (argc >= 3) {
+        flagsString = argv[2];
     } else {
-        printf("Enter x coordinate or press enter to use the spawn x coordinate: ");
-        getLine(xString, n, stdin);
+        printf("Enter flags or press enter to use the default flags: ");
+        getLine(flagsString, lineLength, stdin);
     }
 
-    int xSpawn = xString[0] == '\0';
+    uint32_t flags = 0;
+
+    if (flagsString[0] != '\0' && sscanf(flagsString, "%" SCNu32, &flags) != 1) {
+        printf("Invalid flags '%s'.\n", flagsString);
+        getchar();
+        return 1;
+    }
+
+    char* dimString = line1;
+
+    if (argc >= 4) {
+        dimString = argv[3];
+    } else {
+        printf("Enter dimension ID or press enter to use the default dimension ID: ");
+        getLine(dimString, lineLength, stdin);
+    }
+
+    int dim = 0;
+
+    if (dimString[0] != '\0' && (sscanf(dimString, "%d", &dim) != 1 || dim < -1 || dim > 1)) {
+        printf("Invalid dimension ID '%s'.\n", dimString);
+        getchar();
+        return 1;
+    }
+
+    char* seedsFileString = line1;
+
+    if (argc >= 5) {
+        seedsFileString = argv[4];
+    } else {
+        printf("Enter seeds file or press enter to use random seeds: ");
+        getLine(seedsFileString, lineLength, stdin);
+    }
+
+    FILE* seedsFile = NULL;
+
+    if (seedsFileString[0] != '\0' && (seedsFile = fopen(seedsFileString, "r")) == NULL) {
+        printf("Invalid seeds file '%s'.\n", seedsFileString);
+        getchar();
+        return 1;
+    }
+
+    char* xString = line1;
+
+    if (argc >= 6) {
+        xString = argv[5];
+    } else {
+        printf("Enter x coordinate or press enter to use the spawn x coordinate: ");
+        getLine(xString, lineLength, stdin);
+    }
+
+    int useSpawnX = xString[0] == '\0';
     int x;
 
-    if (!xSpawn && sscanf(xString, "%d", &x) != 1) {
+    if (!useSpawnX && sscanf(xString, "%d", &x) != 1) {
         printf("Invalid x coordinate '%s'.\n", xString);
         getchar();
         return 1;
@@ -78,29 +134,47 @@ int main(int argc, char* argv[]) {
 
     char* zString = line1;
 
-    if (argc >= 4) {
-        zString = argv[3];
+    if (argc >= 7) {
+        zString = argv[6];
     } else {
         printf("Enter z coordinate or press enter to use the spawn z coordinate: ");
-        getLine(zString, n, stdin);
+        getLine(zString, lineLength, stdin);
     }
 
-    int zSpawn = zString[0] == '\0';
+    int useSpawnZ = zString[0] == '\0';
     int z;
 
-    if (!zSpawn && sscanf(zString, "%d", &z) != 1) {
+    if (!useSpawnZ && sscanf(zString, "%d", &z) != 1) {
         printf("Invalid z coordinate '%s'.\n", zString);
+        getchar();
+        return 1;
+    }
+
+    char* yString = line1;
+
+    if (argc >= 8) {
+        yString = argv[7];
+    } else {
+        printf("Enter y coordinate or press enter to use the approximate height at the given x and z coordinates: ");
+        getLine(yString, lineLength, stdin);
+    }
+
+    int useHeightAtXZ = yString[0] == '\0';
+    int y;
+
+    if (!useHeightAtXZ && sscanf(yString, "%d", &y) != 1) {
+        printf("Invalid y coordinate '%s'.\n", yString);
         getchar();
         return 1;
     }
 
     char* radiusString = line1;
 
-    if (argc >= 5) {
-        radiusString = argv[4];
+    if (argc >= 9) {
+        radiusString = argv[8];
     } else {
         printf("Enter radius or press enter to use no radius: ");
-        getLine(radiusString, n, stdin);
+        getLine(radiusString, lineLength, stdin);
     }
 
     int radius = 0;
@@ -113,11 +187,11 @@ int main(int argc, char* argv[]) {
 
     char* setRelationString = line1;
 
-    if (argc >= 6) {
-        setRelationString = argv[5];
+    if (argc >= 10) {
+        setRelationString = argv[9];
     } else {
         printf("Enter set relation ID or press enter to use equal: ");
-        getLine(setRelationString, n, stdin);
+        getLine(setRelationString, lineLength, stdin);
     }
 
     int setRelation = EQUAL;
@@ -130,11 +204,11 @@ int main(int argc, char* argv[]) {
 
     char* biomesString = line1;
 
-    if (argc >= 7) {
-        biomesString = argv[6];
+    if (argc >= 11) {
+        biomesString = argv[10];
     } else {
         printf("Enter biome ID sets separated by '|' with biome IDs separated by ',' or press enter to use no biome ID sets: ");
-        getLine(biomesString, n, stdin);
+        getLine(biomesString, lineLength, stdin);
     }
 
     int biomeSetCount = 0;
@@ -201,84 +275,67 @@ int main(int argc, char* argv[]) {
         biomeSets[i] = biomes;
     }
 
-    char* spawnString = line1;
+    char* checkSpawnXString = line1;
 
-    if (argc >= 8) {
-        spawnString = argv[7];
+    if (argc >= 12) {
+        checkSpawnXString = argv[11];
     } else {
-        printf("Enter 'y' to check if the spawn is at the given coordinates or press enter: ");
-        getLine(spawnString, n, stdin);
+        printf("Enter 'y' to check if the spawn x coordinate matches the given x coordinate or press enter: ");
+        getLine(checkSpawnXString, lineLength, stdin);
     }
 
-    int spawn = 0;
+    int checkSpawnX = 0;
 
-    if (spawnString[0] != '\0' && !(spawn = spawnString[0] == 'y' && spawnString[1] == '\0')) {
-        printf("Invalid option '%s'.\n", spawnString);
+    if (checkSpawnXString[0] != '\0' && !(checkSpawnX = checkSpawnXString[0] == 'y' && checkSpawnXString[1] == '\0')) {
+        printf("Invalid option '%s'.\n", checkSpawnXString);
         getchar();
         return 1;
     }
 
-    char* dimString = line1;
+    char* checkSpawnZString = line1;
 
-    if (argc >= 9) {
-        dimString = argv[8];
+    if (argc >= 13) {
+        checkSpawnZString = argv[12];
     } else {
-        printf("Enter dimension ID or press enter to use the default dimension ID: ");
-        getLine(dimString, n, stdin);
+        printf("Enter 'y' to check if the spawn z coordinate matches the given z coordinate or press enter: ");
+        getLine(checkSpawnZString, lineLength, stdin);
     }
 
-    int dim = 0;
+    int checkSpawnZ = 0;
 
-    if (dimString[0] != '\0' && (sscanf(dimString, "%d", &dim) != 1 || dim < -1 || dim > 1)) {
-        printf("Invalid dimension ID '%s'.\n", dimString);
+    if (checkSpawnZString[0] != '\0' && !(checkSpawnZ = checkSpawnZString[0] == 'y' && checkSpawnZString[1] == '\0')) {
+        printf("Invalid option '%s'.\n", checkSpawnZString);
         getchar();
         return 1;
     }
 
-    char* flagsString = line1;
+    char* checkHeightAtXZString = line1;
 
-    if (argc >= 10) {
-        flagsString = argv[9];
+    if (argc >= 14) {
+        checkHeightAtXZString = argv[13];
     } else {
-        printf("Enter flags or press enter to use the default flags: ");
-        getLine(flagsString, n, stdin);
+        printf("Enter 'y' to check if the approximate height at the given x and z coordinates matches the given y coordinate or press enter: ");
+        getLine(checkHeightAtXZString, lineLength, stdin);
     }
 
-    uint32_t flags = 0;
+    int checkHeightAtXZ = 0;
 
-    if (flagsString[0] != '\0' && sscanf(flagsString, "%" SCNu32, &flags) != 1) {
-        printf("Invalid flags '%s'.\n", flagsString);
-        getchar();
-        return 1;
-    }
-
-    char* seedsFileString = line1;
-
-    if (argc >= 11) {
-        seedsFileString = argv[10];
-    } else {
-        printf("Enter seeds file or press enter to use random seeds: ");
-        getLine(seedsFileString, n, stdin);
-    }
-
-    FILE* seedsFile = NULL;
-
-    if (seedsFileString[0] != '\0' && (seedsFile = fopen(seedsFileString, "r")) == NULL) {
-        printf("Invalid seeds file '%s'.\n", seedsFileString);
+    if (checkHeightAtXZString[0] != '\0' && !(checkHeightAtXZ = checkHeightAtXZString[0] == 'y' && checkHeightAtXZString[1] == '\0')) {
+        printf("Invalid option '%s'.\n", checkHeightAtXZString);
         getchar();
         return 1;
     }
 
     srand(time(NULL));
-    Generator g;
-    setupGenerator(&g, mc, flags);
+    Generator generator;
+    setupGenerator(&generator, mc, flags);
     long long counter = 0LL;
 
-    while (seedsFile == NULL || getLine(line1, n, seedsFile) != NULL) {
+    while (seedsFile == NULL || getLine(line1, lineLength, seedsFile) != NULL) {
         uint64_t seed;
 
         if (seedsFile == NULL) {
-            seed = rand64();
+            seed = random64();
         } else {
             int64_t result;
 
@@ -292,95 +349,157 @@ int main(int argc, char* argv[]) {
             seed = result;
         }
 
-        applySeed(&g, dim, seed);
-        Pos pos;
-        int posCalculated = 0;
-        int biome = -1;
-        int biomeCalculated = 0;
-        int biomesCheck = biomeSetCount == 0;
+        applySeed(&generator, dim, seed);
+        Pos spawn;
+        int spawnCalculated = 0;
+        int heightAtXZ;
+        int heightAtXZCalculated = 0;
+        int biomeAtXYZ;
+        int biomeAtXYZCalculated = 0;
+        int biomesCheckResult;
 
-        if (!biomesCheck) {
-            if (xSpawn || zSpawn) {
-                pos = getSpawn(&g);
-                posCalculated = 1;
+        if (biomeSetCount != 0) {
+            if (useSpawnX || useSpawnZ) {
+                spawn = getSpawn(&generator);
+                spawnCalculated = 1;
 
-                if (xSpawn) {
-                    x = pos.x;
+                if (useSpawnX) {
+                    x = spawn.x;
                 }
 
-                if (zSpawn) {
-                    z = pos.z;
+                if (useSpawnZ) {
+                    z = spawn.z;
                 }
+            }
+
+            if (useHeightAtXZ) {
+                heightAtXZ = floorToInt(getApproximateHeight(&generator, x, z));
+                heightAtXZCalculated = 1;
+                y = heightAtXZ;
             }
 
             BiomeSequenceData biomeSequenceData;
-            biomeSequenceData.g = &g;
+            biomeSequenceData.generator = &generator;
             biomeSequenceData.x = x;
+            biomeSequenceData.y = y;
             biomeSequenceData.z = z;
             biomeSequenceData.radius = radius;
-            biomeSequenceData.biome = biome;
-            biomeSequenceData.biomeCalculated = biomeCalculated;
-            biomesCheck = setBySequenceIndicatorFunction((2 * radius + 1) * (2 * radius + 1), biomeSequence, &biomeSequenceData, biomeSetCount, biomeCounts, biomeSets, setRelation);
-            biome = biomeSequenceData.biome;
-            biomeCalculated = biomeSequenceData.biomeCalculated;
+            biomeSequenceData.biomeAtXYZCalculated = biomeAtXYZCalculated;
+            biomesCheckResult = setBySequenceIndicatorFunction((2 * radius + 1) * (2 * radius + 1), biomeSequence, &biomeSequenceData, biomeSetCount, biomeCounts, biomeSets, setRelation);
+            biomeAtXYZ = biomeSequenceData.biomeAtXYZ;
+            biomeAtXYZCalculated = biomeSequenceData.biomeAtXYZCalculated;
+        } else {
+            biomesCheckResult = 1;
         }
 
-        if (biomesCheck) {
-            int spawnCheck = !spawn;
+        if (biomesCheckResult) {
+            int spawnCheckResult;
 
-            if (!spawnCheck) {
-                if (!posCalculated) {
-                    pos = getSpawn(&g);
-                    posCalculated = 1;
+            if (checkSpawnX || checkSpawnZ) {
+                if (!spawnCalculated) {
+                    spawn = getSpawn(&generator);
+                    spawnCalculated = 1;
 
-                    if (xSpawn) {
-                        x = pos.x;
+                    if (useSpawnX) {
+                        x = spawn.x;
                     }
 
-                    if (zSpawn) {
-                        z = pos.z;
+                    if (useSpawnZ) {
+                        z = spawn.z;
                     }
                 }
 
-                spawnCheck = pos.x == x && pos.z == z;
+                spawnCheckResult = (!checkSpawnX || spawn.x == x) && (!checkSpawnZ || spawn.z == z);
+            } else {
+                spawnCheckResult = 1;
             }
 
-            if (spawnCheck) {
-                if (!posCalculated && dim == 0) {
-                    pos = getSpawn(&g);
-                    posCalculated = 1;
+            if (spawnCheckResult) {
+                int heightCheckResult;
 
-                    if (xSpawn) {
-                        x = pos.x;
+                if (checkHeightAtXZ) {
+                    if ((useSpawnX || useSpawnZ) && !spawnCalculated) {
+                        spawn = getSpawn(&generator);
+                        spawnCalculated = 1;
+
+                        if (useSpawnX) {
+                            x = spawn.x;
+                        }
+
+                        if (useSpawnZ) {
+                            z = spawn.z;
+                        }
                     }
 
-                    if (zSpawn) {
-                        z = pos.z;
+                    if (!heightAtXZCalculated) {
+                        heightAtXZ = floorToInt(getApproximateHeight(&generator, x, z));
+                        heightAtXZCalculated = 1;
+
+                        if (useHeightAtXZ) {
+                            y = heightAtXZ;
+                        }
                     }
-                }
 
-                if (!biomeCalculated && (posCalculated || !xSpawn && !zSpawn)) {
-                    biome = getBiomeAt(&g, 1, x, 64, z);
-                    biomeCalculated = 1;
-                }
-
-                int64_t result = seed;
-                printf("%" PRId64 " (", result);
-
-                if (biomeCalculated) {
-                    printf("biome ID: %d, ", biome);
+                    heightCheckResult = heightAtXZ == y;
                 } else {
-                    printf("biome ID: -, ");
+                    heightCheckResult = 1;
                 }
 
-                if (posCalculated) {
-                    printf("spawn x: %d, spawn z: %d, ", pos.x, pos.z);
+                if (heightCheckResult) {
+                    if ((dim == 0 || useSpawnX || useSpawnZ) && !spawnCalculated) {
+                        spawn = getSpawn(&generator);
+                        spawnCalculated = 1;
+
+                        if (useSpawnX) {
+                            x = spawn.x;
+                        }
+
+                        if (useSpawnZ) {
+                            z = spawn.z;
+                        }
+                    }
+
+                    if (useHeightAtXZ && !heightAtXZCalculated) {
+                        heightAtXZ = floorToInt(getApproximateHeight(&generator, x, z));
+                        heightAtXZCalculated = 1;
+                        y = heightAtXZ;
+                    }
+
+                    if (!biomeAtXYZCalculated) {
+                        biomeAtXYZ = getBiomeAt(&generator, 1, x, y, z);
+                        biomeAtXYZCalculated = 1;
+                    }
+
+                    int heightAtSpawn;
+                    int biomeAtSpawn;
+
+                    if ((useSpawnX || checkSpawnX) && (useSpawnZ || checkSpawnZ) && heightAtXZCalculated) {
+                        heightAtSpawn = heightAtXZ;
+
+                        if (useHeightAtXZ || checkHeightAtXZ) {
+                            biomeAtSpawn = biomeAtXYZ;
+                        } else {
+                            biomeAtSpawn = getBiomeAt(&generator, 1, spawn.x, heightAtSpawn, spawn.z);
+                        }
+                    } else if (spawnCalculated) {
+                        heightAtSpawn = floorToInt(getApproximateHeight(&generator, spawn.x, spawn.z));
+                        biomeAtSpawn = getBiomeAt(&generator, 1, spawn.x, heightAtSpawn, spawn.z);
+                    }
+
+                    int64_t result = seed;
+                    printf("%" PRId64 " (x: %d, y: %d, z: %d, biome ID: %d, ", result, x, y, z, biomeAtXYZ);
+
+                    if (spawnCalculated) {
+                        printf("spawn x: %d, spawn z: %d, height at spawn: %d, biome ID at spawn: %d, ", spawn.x, spawn.z, heightAtSpawn, biomeAtSpawn);
+                    } else {
+                        printf("spawn x: -, spawn z: -, height at spawn: -, biome ID at spawn: -, ");
+                    }
+
+                    printf("rejected: %lld)\n", counter);
+                    counter = 0LL;
                 } else {
-                    printf("spawn x: -, spawn z: -, ");
+                    counter++;
                 }
-
-                printf("rejected: %lld)\n", counter);
-                counter = 0LL;
             } else {
                 counter++;
             }
@@ -397,8 +516,8 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-uint64_t rand64(void) {
-    Rand64 result;
+uint64_t random64(void) {
+    Random64 result;
     result.values[0] = rand();
     result.values[1] = rand();
     result.values[2] = rand();
@@ -410,6 +529,19 @@ uint64_t rand64(void) {
     return result.value;
 }
 
+float getApproximateHeight(Generator* generator, int x, int z) {
+    float h;
+    SurfaceNoise surfaceNoise;
+    initSurfaceNoise(&surfaceNoise, generator->dim, generator->seed);
+    mapApproxHeight(&h, NULL, generator, &surfaceNoise, x >> 2, z >> 2, 1, 1);
+    return h;
+}
+
+int floorToInt(float value) {
+    int i = value;
+    return value < i ? i - 1 : i;
+}
+
 int biomeSequence(int index, void* currying) {
     BiomeSequenceData* biomeSequenceData = currying;
 
@@ -418,10 +550,10 @@ int biomeSequence(int index, void* currying) {
     }
 
     if (index == 0) {
-        int biome = getBiomeAt(biomeSequenceData->g, 1, biomeSequenceData->x, 64, biomeSequenceData->z);
-        biomeSequenceData->biome = biome;
-        biomeSequenceData->biomeCalculated = 1;
-        return biome;
+        int biomeAtXYZ = getBiomeAt(biomeSequenceData->generator, 1, biomeSequenceData->x, biomeSequenceData->y, biomeSequenceData->z);
+        biomeSequenceData->biomeAtXYZ = biomeAtXYZ;
+        biomeSequenceData->biomeAtXYZCalculated = 1;
+        return biomeAtXYZ;
     }
 
     if (biomeSequenceData->radius == 0) {
@@ -429,19 +561,19 @@ int biomeSequence(int index, void* currying) {
     }
 
     if (index == 1) {
-        return getBiomeAt(biomeSequenceData->g, 1, biomeSequenceData->x - biomeSequenceData->radius, 64, biomeSequenceData->z - biomeSequenceData->radius);
+        return getBiomeAt(biomeSequenceData->generator, 1, biomeSequenceData->x - biomeSequenceData->radius, biomeSequenceData->y, biomeSequenceData->z - biomeSequenceData->radius);
     }
 
     if (index == 2) {
-        return getBiomeAt(biomeSequenceData->g, 1, biomeSequenceData->x - biomeSequenceData->radius, 64, biomeSequenceData->z + biomeSequenceData->radius);
+        return getBiomeAt(biomeSequenceData->generator, 1, biomeSequenceData->x - biomeSequenceData->radius, biomeSequenceData->y, biomeSequenceData->z + biomeSequenceData->radius);
     }
 
     if (index == 3) {
-        return getBiomeAt(biomeSequenceData->g, 1, biomeSequenceData->x + biomeSequenceData->radius, 64, biomeSequenceData->z - biomeSequenceData->radius);
+        return getBiomeAt(biomeSequenceData->generator, 1, biomeSequenceData->x + biomeSequenceData->radius, biomeSequenceData->y, biomeSequenceData->z - biomeSequenceData->radius);
     }
 
     if (index == 4) {
-        return getBiomeAt(biomeSequenceData->g, 1, biomeSequenceData->x + biomeSequenceData->radius, 64, biomeSequenceData->z + biomeSequenceData->radius);
+        return getBiomeAt(biomeSequenceData->generator, 1, biomeSequenceData->x + biomeSequenceData->radius, biomeSequenceData->y, biomeSequenceData->z + biomeSequenceData->radius);
     }
 
     index -= 5;
@@ -470,7 +602,7 @@ int biomeSequence(int index, void* currying) {
 
     int i = index / (2 * biomeSequenceData->radius + 1);
     int j = index - i * (2 * biomeSequenceData->radius + 1);
-    return getBiomeAt(biomeSequenceData->g, 1, biomeSequenceData->x - biomeSequenceData->radius + i, 64, biomeSequenceData->z - biomeSequenceData->radius + j);
+    return getBiomeAt(biomeSequenceData->generator, 1, biomeSequenceData->x - biomeSequenceData->radius + i, biomeSequenceData->y, biomeSequenceData->z - biomeSequenceData->radius + j);
 }
 
 int setBySequenceIndicatorFunction(int sequenceLength, int(* sequence)(int, void*), void* currying, int setCount, int elementCounts[], int* sets[], int setRelation) {
