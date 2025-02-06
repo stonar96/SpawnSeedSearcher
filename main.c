@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
 #include "cubiomes/finders.h"
-#include "cubiomes/generator.h"
 #include "randombytes/randombytes.h"
 
 typedef struct BiomeSequenceData BiomeSequenceData;
