@@ -3,13 +3,7 @@
 #include <time.h>
 #include "cubiomes/finders.h"
 #include "cubiomes/generator.h"
-
-typedef union Random64 Random64;
-
-union Random64 {
-    uint64_t value;
-    uint8_t values[8];
-};
+#include "randombytes/randombytes.h"
 
 typedef struct BiomeSequenceData BiomeSequenceData;
 
@@ -26,8 +20,6 @@ struct BiomeSequenceData {
 enum SetRelation {
     EQUAL, SUBSET, SUPERSET, INTERSECT
 };
-
-uint64_t random64(void);
 
 float getApproximateHeight(Generator*, int, int);
 
@@ -326,7 +318,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    srand(time(NULL));
     Generator generator;
     setupGenerator(&generator, mc, flags);
     long long counter = 0LL;
@@ -335,7 +326,13 @@ int main(int argc, char* argv[]) {
         uint64_t seed;
 
         if (seedsFile == NULL) {
-            seed = random64();
+            int randombytesError = randombytes(&seed, sizeof(seed));
+
+            if (randombytesError != 0) {
+                printf("Error '%d' in randombytes.\n", randombytesError);
+                getchar();
+                return 1;
+            }
         } else {
             int64_t result;
 
@@ -514,19 +511,6 @@ int main(int argc, char* argv[]) {
 
     getchar();
     return 0;
-}
-
-uint64_t random64(void) {
-    Random64 result;
-    result.values[0] = rand();
-    result.values[1] = rand();
-    result.values[2] = rand();
-    result.values[3] = rand();
-    result.values[4] = rand();
-    result.values[5] = rand();
-    result.values[6] = rand();
-    result.values[7] = rand();
-    return result.value;
 }
 
 float getApproximateHeight(Generator* generator, int x, int z) {
